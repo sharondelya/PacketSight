@@ -1,0 +1,51 @@
+# PacketSight - Network Traffic Analyzer Dependencies
+# Author: sharondelya
+# Professional network monitoring and analysis tool
+
+# Core web framework and database dependencies
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.23
+Werkzeug==3.0.1
+
+# Database support
+psycopg2-binary==2.9.9
+
+# Web server for production deployment
+gunicorn==21.2.0
+
+# Network packet capture and analysis
+scapy==2.5.0
+netifaces==0.11.0
+psutil==5.9.6
+
+# Additional utilities
+email-validator==2.1.0
+python-dotenv==1.0.0
+
+# Development and testing dependencies (optional)
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-flask==1.3.0
+
+# Security and validation
+cryptography==41.0.7
+itsdangerous==2.1.2
+
+# Date and time handling
+python-dateutil==2.8.2
+
+# File handling and validation
+pathlib2==2.3.7
+python-magic==0.4.27
+# Logging and monitoring
+colorlog==6.8.0
+
+# Performance monitoring
+memory-profiler==0.61.0
+
+# Optional: For advanced features
+# numpy==1.24.3          # For advanced analytics
+# pandas==2.0.3          # For data analysis
+# matplotlib==3.7.2      # For additional plotting
+# seaborn==0.12.2        # For statistical visualizations

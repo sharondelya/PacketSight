@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Network Traffic Analyzer{% endblock %} - sharondelya</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    
+    <meta name="author" content="sharondelya">
+    <meta name="description" content="Professional Network Traffic Analyzer with real-time monitoring and analysis capabilities">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-network-wired me-2"></i>
+                <span class="brand-text">Network Analyzer</span>
+                <small class="ms-2 text-muted">by sharondelya</small>
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-tachometer-alt me-1"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'packets' %}active{% endif %}" href="{{ url_for('packets') }}">
+                            <i class="fas fa-exchange-alt me-1"></i> Packets
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'flows' %}active{% endif %}" href="{{ url_for('flows') }}">
+                            <i class="fas fa-project-diagram me-1"></i> Flows
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}">
+                            <i class="fas fa-chart-line me-1"></i> Analytics
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'upload_page' %}active{% endif %}" href="{{ url_for('upload_page') }}">
+                            <i class="fas fa-upload me-1"></i> Upload PCAP
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Status Bar -->
+    <div class="status-bar bg-light border-bottom">
+        <div class="container">
+            <div class="row align-items-center py-2">
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center">
+                        <div class="status-indicator me-3">
+                            <span class="status-dot status-warning" id="captureStatusDot"></span>
+                            <small class="text-muted" id="captureStatusText">Capture Stopped</small>
+                        </div>
+                        <div class="me-3">
+                            <small class="text-muted">Last Update: <span id="lastUpdate">--:--:--</span></small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <button class="btn btn-sm btn-outline-success me-2" id="startCaptureBtn" onclick="startPacketCapture()">
+                        <i class="fas fa-play"></i> Start Capture
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger me-2" id="stopCaptureBtn" onclick="stopPacketCapture()" style="display: none;">
+                        <i class="fas fa-stop"></i> Stop Capture
+                    </button>
+                    <div class="capture-progress me-2" id="captureProgress" style="display: none;">
+                        <small class="text-muted">
+                            <span id="capturePacketCount">0</span> packets captured
+                            (<span id="captureRate">0 pps</span>)
+                        </small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary me-2" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <button class="btn btn-sm btn-success" onclick="simulateTraffic()">
+                        <i class="fas fa-play"></i> Simulate Traffic
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container mt-4">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer bg-dark text-light mt-5">
+        <div class="container py-4">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-network-wired me-2"></i>Network Traffic Analyzer</h6>
+                    <p class="mb-0 text-muted">Professional network monitoring and analysis tool</p>
+                    <p class="mb-0 text-muted">Developed by <strong>sharondelya</strong></p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="footer-stats">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="stat-item">
+                                    <small class="text-muted d-block">Total Packets</small>
+                                    <span id="footerPacketCount" class="text-primary fw-bold">--</span>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-item">
+                                    <small class="text-muted d-block">Active Flows</small>
+                                    <span id="footerActiveFlows" class="text-success fw-bold">--</span>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-item">
+                                    <small class="text-muted d-block">Uptime</small>
+                                    <span id="footerUptime" class="text-info fw-bold">--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <hr class="my-3">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <small class="text-muted">&copy; 2023 sharondelya. Network Traffic Analyzer. All rights reserved.</small>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <small class="text-muted">
+                        Built with Flask, Chart.js, and Bootstrap | 
+                        <a href="{{ url_for('documentation') }}" class="text-decoration-none text-info">Documentation</a> | 
+                        <a href="https://github.com/sharondelya/PacketSight" target="_blank" class="text-decoration-none text-info">GitHub</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    
+    {% block scripts %}{% endblock %}
+
+    <script>
+        // Global capture progress tracking
+        let captureProgressInterval = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            updateLastUpdateTime();
+            updateFooterStats();
+            checkCaptureStatus();
+            
+            // Update every 30 seconds
+            setInterval(function() {
+                updateLastUpdateTime();
+                updateFooterStats();
+                checkCaptureStatus();
+            }, 30000);
+        });
+
+        function updateLastUpdateTime() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = 
+                now.toLocaleTimeString('en-US', { hour12: false });
+        }
+
+        function updateFooterStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error fetching stats:', data.error);
+                        return;
+                    }
+                    
+                    document.getElementById('footerPacketCount').textContent = 
+                        data.total_packets ? data.total_packets.toLocaleString() : '0';
+                    document.getElementById('footerActiveFlows').textContent = 
+                        data.active_flows || '0';
+                    
+                    // Calculate simple uptime (hours since page load)
+                    const uptime = Math.floor((Date.now() - window.pageLoadTime) / (1000 * 60 * 60));
+                    document.getElementById('footerUptime').textContent = uptime + 'h';
+                })
+                .catch(error => {
+                    console.error('Error updating footer stats:', error);
+                });
+        }
+
+        function checkCaptureStatus() {
+            fetch('/capture-status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusDot = document.getElementById('captureStatusDot');
+                    const statusText = document.getElementById('captureStatusText');
+                    const startBtn = document.getElementById('startCaptureBtn');
+                    const stopBtn = document.getElementById('stopCaptureBtn');
+                    const progressDiv = document.getElementById('captureProgress');
+                    
+                    if (data.active) {
+                        statusDot.className = 'status-dot status-active';
+                        statusText.textContent = `Capturing on ${data.interface || 'unknown'}`;
+                        startBtn.style.display = 'none';
+                        stopBtn.style.display = 'inline-block';
+                        progressDiv.style.display = 'inline-block';
+                        
+                        // Update progress info
+                        document.getElementById('capturePacketCount').textContent = data.packets_captured || 0;
+                        document.getElementById('captureRate').textContent = data.estimated_rate || '0 pps';
+                        
+                        // Start progress updates if not already running
+                        if (!captureProgressInterval) {
+                            startCaptureProgressUpdates();
+                        }
+                    } else {
+                        statusDot.className = 'status-dot status-warning';
+                        statusText.textContent = 'Capture Stopped';
+                        startBtn.style.display = 'inline-block';
+                        stopBtn.style.display = 'none';
+                        progressDiv.style.display = 'none';
+                        
+                        // Stop progress updates
+                        if (captureProgressInterval) {
+                            clearInterval(captureProgressInterval);
+                            captureProgressInterval = null;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking capture status:', error);
+                });
+        }
+
+        function startCaptureProgressUpdates() {
+            captureProgressInterval = setInterval(function() {
+                fetch('/api/capture-progress')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.active) {
+                            document.getElementById('capturePacketCount').textContent = data.packet_count || 0;
+                            document.getElementById('captureRate').textContent = data.packets_per_second + ' pps' || '0 pps';
+                        } else {
+                            // Capture stopped, clear interval
+                            clearInterval(captureProgressInterval);
+                            captureProgressInterval = null;
+                            checkCaptureStatus();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating capture progress:', error);
+                    });
+            }, 2000); // Update every 2 seconds
+        }
+
+        function startPacketCapture() {
+            const btn = document.getElementById('startCaptureBtn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+            btn.disabled = true;
+            
+            fetch('/api/start-capture', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    interface: 'auto',
+                    duration: null // Unlimited duration
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Success', data.message, 'success');
+                    checkCaptureStatus();
+                } else {
+                    showToast('Error', data.message || 'Failed to start capture', 'error');
+                }
+            })
+            .catch(error => {
+                showToast('Error', 'Network error occurred', 'error');
+                console.error('Error:', error);
+            })
+            .finally(() => {
+                btn.innerHTML = '<i class="fas fa-play"></i> Start Capture';
+                btn.disabled = false;
+            });
+        }
+
+        function stopPacketCapture() {
+            const btn = document.getElementById('stopCaptureBtn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
+            btn.disabled = true;
+            
+            fetch('/api/stop-capture', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Success', data.message, 'success');
+                    checkCaptureStatus();
+                } else {
+                    showToast('Error', data.message || 'Failed to stop capture', 'error');
+                }
+            })
+            .catch(error => {
+                showToast('Error', 'Network error occurred', 'error');
+                console.error('Error:', error);
+            })
+            .finally(() => {
+                btn.innerHTML = '<i class="fas fa-stop"></i> Stop Capture';
+                btn.disabled = false;
+            });
+        }
+
+        function refreshData() {
+            // Show loading indication
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+            btn.disabled = true;
+            
+            // Refresh current page
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
+
+        function simulateTraffic() {
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            btn.disabled = true;
+            
+            fetch('/simulate-traffic', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    packet_count: 100,
+                    protocols: ['TCP', 'UDP', 'HTTP', 'DNS']
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Success', `Generated ${data.generated_packets} packets`, 'success');
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    showToast('Error', data.error || 'Failed to generate traffic', 'error');
+                }
+            })
+            .catch(error => {
+                showToast('Error', 'Network error occurred', 'error');
+                console.error('Error:', error);
+            })
+            .finally(() => {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            });
+        }
+
+        function showToast(title, message, type = 'info') {
+            // Create toast element
+            const toastHtml = `
+                <div class="toast align-items-center text-white bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'}" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <strong>${title}:</strong> ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+            
+            // Add to page and show
+            const toastContainer = document.getElementById('toastContainer') || createToastContainer();
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            
+            const toastElement = toastContainer.lastElementChild;
+            const toast = new bootstrap.Toast(toastElement);
+            toast.show();
+            
+            // Remove after hiding
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        }
+
+        function createToastContainer() {
+            const container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.className = 'toast-container position-fixed top-0 end-0 p-3';
+            container.style.zIndex = '11';
+            document.body.appendChild(container);
+            return container;
+        }
+
+        // Track page load time for uptime calculation
+        window.pageLoadTime = Date.now();
+    </script>
+</body>
+</html>

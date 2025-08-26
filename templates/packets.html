@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+
+{% block title %}Packet Analysis{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-exchange-alt text-primary me-2"></i>
+                Packet Analysis
+            </h1>
+            <p class="text-muted mb-0">Detailed network packet capture and analysis</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <button class="btn btn-outline-primary btn-sm me-2" onclick="exportPackets()">
+                <i class="fas fa-download"></i> Export
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="refreshPackets()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Filters and Search -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="protocol" class="form-label">Protocol</label>
+                        <select class="form-select" id="protocol" name="protocol">
+                            <option value="all" {% if not current_protocol or current_protocol == 'all' %}selected{% endif %}>All Protocols</option>
+                            {% for protocol in protocols %}
+                            <option value="{{ protocol }}" {% if current_protocol == protocol %}selected{% endif %}>
+                                {{ protocol }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label for="ip" class="form-label">IP Address</label>
+                        <input type="text" class="form-control" id="ip" name="ip" 
+                               value="{{ current_ip or '' }}" placeholder="e.g., 192.168.1.100">
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label for="time_range" class="form-label">Time Range</label>
+                        <select class="form-select" id="time_range" name="time_range">
+                            <option value="1h" {% if current_time_range == '1h' %}selected{% endif %}>Last Hour</option>
+                            <option value="6h" {% if current_time_range == '6h' %}selected{% endif %}>Last 6 Hours</option>
+                            <option value="12h" {% if current_time_range == '12h' %}selected{% endif %}>Last 12 Hours</option>
+                            <option value="24h" {% if current_time_range == '24h' %}selected{% endif %}>Last 24 Hours</option>
+                            <option value="7d" {% if current_time_range == '7d' %}selected{% endif %}>Last 7 Days</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label for="search" class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search me-1"></i> Filter
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Packet Statistics Summary -->
+{% if packets and packets.items %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-primary">{{ "{:,}".format(packets.total) }}</h5>
+                <p class="card-text text-muted">Total Packets</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-success">
+                    {% set total_bytes = packets.items | sum(attribute='packet_size') %}
+                    {{ "%.1f MB"|format(total_bytes / 1048576) if total_bytes else "0 MB" }}
+                </h5>
+                <p class="card-text text-muted">Total Data</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-info">
+                    {% set avg_size = (total_bytes / packets.items|length) if packets.items else 0 %}
+                    {{ "%.0f bytes"|format(avg_size) }}
+                </h5>
+                <p class="card-text text-muted">Avg Packet Size</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-warning">{{ protocols|length }}</h5>
+                <p class="card-text text-muted">Protocols</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Packet Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>
+                    Packet Details
+                    {% if packets %}
+                    <span class="badge bg-primary ms-2">{{ "{:,}".format(packets.total) }} total</span>
+                    {% endif %}
+                </h6>
+                
+                {% if packets and packets.pages > 1 %}
+                <div class="pagination-info">
+                    <small class="text-muted">
+                        Page {{ packets.page }} of {{ packets.pages }}
+                        ({{ packets.per_page }} per page)
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="card-body p-0">
+                {% if packets and packets.items %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th width="5%">#</th>
+                                <th width="12%">Timestamp</th>
+                                <th width="15%">Source</th>
+                                <th width="15%">Destination</th>
+                                <th width="8%">Protocol</th>
+                                <th width="8%">Size</th>
+                                <th width="10%">Flags</th>
+                                <th width="27%">Payload Preview</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for packet in packets.items %}
+                            <tr class="packet-row" onclick="showPacketDetails({{ packet.id }})">
+                                <td>
+                                    <small class="text-muted">#{{ packet.id }}</small>
+                                </td>
+                                <td>
+                                    <small>{{ packet.timestamp.strftime('%H:%M:%S') if packet.timestamp else 'N/A' }}</small>
+                                    <br>
+                                    <small class="text-muted">{{ packet.timestamp.strftime('%m/%d') if packet.timestamp else '' }}</small>
+                                </td>
+                                <td>
+                                    <code class="text-primary">{{ packet.source_ip }}</code>
+                                    {% if packet.source_port %}
+                                    <br>
+                                    <small class="text-muted">:{{ packet.source_port }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <code class="text-warning">{{ packet.dest_ip }}</code>
+                                    {% if packet.dest_port %}
+                                    <br>
+                                    <small class="text-muted">:{{ packet.dest_port }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="protocol-badge protocol-{{ packet.protocol.lower() }}">
+                                        {{ packet.protocol }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="fw-bold">{{ "{:,}".format(packet.packet_size) }}</span>
+                                    <br>
+                                    <small class="text-muted">bytes</small>
+                                </td>
+                                <td>
+                                    {% if packet.flags %}
+                                    <span class="badge bg-secondary">{{ packet.flags }}</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if packet.payload_preview %}
+                                    <small class="font-monospace text-truncate d-block">
+                                        {{ packet.payload_preview[:50] }}{% if packet.payload_preview|length > 50 %}...{% endif %}
+                                    </small>
+                                    {% else %}
+                                    <small class="text-muted">No payload data</small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                {% if packets.pages > 1 %}
+                <div class="card-footer">
+                    <nav aria-label="Packet pagination">
+                        <ul class="pagination pagination-sm justify-content-center mb-0">
+                            {% if packets.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('packets', page=packets.prev_num, protocol=current_protocol, ip=current_ip, time_range=current_time_range) }}">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page_num in packets.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+                                {% if page_num %}
+                                    {% if page_num != packets.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('packets', page=page_num, protocol=current_protocol, ip=current_ip, time_range=current_time_range) }}">{{ page_num }}</a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if packets.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('packets', page=packets.next_num, protocol=current_protocol, ip=current_ip, time_range=current_time_range) }}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+                
+                {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-5">
+                    <i class="fas fa-inbox text-muted fa-3x mb-3"></i>
+                    <h5 class="text-muted">No packets found</h5>
+                    <p class="text-muted mb-4">
+                        {% if current_protocol or current_ip %}
+                        No packets match your current filters. Try adjusting your search criteria.
+                        {% else %}
+                        No network packets have been captured yet.
+                        {% endif %}
+                    </p>
+                    <div class="d-inline-flex gap-2">
+                        <button class="btn btn-primary" onclick="simulateTraffic()">
+                            <i class="fas fa-play me-1"></i> Generate Sample Traffic
+                        </button>
+                        {% if current_protocol or current_ip %}
+                        <a href="{{ url_for('packets') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i> Clear Filters
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Packet Details Modal -->
+<div class="modal fade" id="packetDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Packet Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="packetDetailsContent">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="exportPacketDetails()">
+                    <i class="fas fa-download me-1"></i> Export Details
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPacketData = null;
+
+function showPacketDetails(packetId) {
+    const modal = new bootstrap.Modal(document.getElementById('packetDetailsModal'));
+    const content = document.getElementById('packetDetailsContent');
+    
+    // Show loading state
+    content.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mt-2">Loading packet details...</p>
+        </div>
+    `;
+    
+    modal.show();
+    
+    // Simulate packet details loading
+    setTimeout(() => {
+        // In a real implementation, this would fetch from /api/packets/{packetId}
+        const packetDetails = generatePacketDetails(packetId);
+        currentPacketData = packetDetails;
+        
+        content.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="fw-bold text-primary">Network Layer</h6>
+                    <table class="table table-sm">
+                        <tr><td class="fw-bold">Source IP:</td><td><code>${packetDetails.source_ip}</code></td></tr>
+                        <tr><td class="fw-bold">Destination IP:</td><td><code>${packetDetails.dest_ip}</code></td></tr>
+                        <tr><td class="fw-bold">Protocol:</td><td><span class="protocol-badge protocol-${packetDetails.protocol.toLowerCase()}">${packetDetails.protocol}</span></td></tr>
+                        <tr><td class="fw-bold">TTL:</td><td>${packetDetails.ttl || 'N/A'}</td></tr>
+                        <tr><td class="fw-bold">Checksum:</td><td><code>${packetDetails.checksum || 'N/A'}</code></td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="fw-bold text-success">Transport Layer</h6>
+                    <table class="table table-sm">
+                        <tr><td class="fw-bold">Source Port:</td><td>${packetDetails.source_port || 'N/A'}</td></tr>
+                        <tr><td class="fw-bold">Destination Port:</td><td>${packetDetails.dest_port || 'N/A'}</td></tr>
+                        <tr><td class="fw-bold">Flags:</td><td>${packetDetails.flags ? '<span class="badge bg-secondary">' + packetDetails.flags + '</span>' : 'N/A'}</td></tr>
+                        <tr><td class="fw-bold">Window Size:</td><td>${packetDetails.window_size || 'N/A'}</td></tr>
+                        <tr><td class="fw-bold">Urgency Pointer:</td><td>${packetDetails.urgency_pointer || 'N/A'}</td></tr>
+                    </table>
+                </div>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-12">
+                    <h6 class="fw-bold text-info">Packet Information</h6>
+                    <table class="table table-sm">
+                        <tr><td class="fw-bold">Timestamp:</td><td>${packetDetails.timestamp}</td></tr>
+                        <tr><td class="fw-bold">Packet Size:</td><td>${packetDetails.packet_size} bytes</td></tr>
+                        <tr><td class="fw-bold">Payload Size:</td><td>${packetDetails.payload_size} bytes</td></tr>
+                    </table>
+                </div>
+            </div>
+            ${packetDetails.payload_preview ? `
+            <hr>
+            <div class="row">
+                <div class="col-12">
+                    <h6 class="fw-bold text-warning">Payload Preview</h6>
+                    <div class="border rounded p-3 bg-light">
+                        <pre class="mb-0 small font-monospace">${packetDetails.payload_preview}</pre>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
+        `;
+    }, 800);
+}
+
+function generatePacketDetails(packetId) {
+    // This would normally come from an API call
+    return {
+        id: packetId,
+        timestamp: new Date().toLocaleString(),
+        source_ip: '192.168.1.' + Math.floor(Math.random() * 254 + 1),
+        dest_ip: '74.125.224.' + Math.floor(Math.random() * 254 + 1),
+        source_port: Math.floor(Math.random() * 30000 + 32768),
+        dest_port: [80, 443, 22, 25, 53][Math.floor(Math.random() * 5)],
+        protocol: ['TCP', 'UDP', 'HTTP'][Math.floor(Math.random() * 3)],
+        packet_size: Math.floor(Math.random() * 1400 + 100),
+        payload_size: Math.floor(Math.random() * 1300 + 50),
+        ttl: Math.floor(Math.random() * 128 + 64),
+        checksum: '0x' + Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase(),
+        flags: ['SYN', 'ACK', 'PSH,ACK', 'FIN,ACK'][Math.floor(Math.random() * 4)],
+        window_size: [8192, 16384, 32768][Math.floor(Math.random() * 3)],
+        urgency_pointer: 0,
+        payload_preview: 'GET /api/data HTTP/1.1\\r\\nHost: example.com\\r\\nUser-Agent: Mozilla/5.0...'
+    };
+}
+
+function refreshPackets() {
+    window.location.reload();
+}
+
+function exportPackets() {
+    const exportModal = document.createElement('div');
+    exportModal.innerHTML = `
+        <div class="modal fade" id="packetsExportModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Export Packets Data</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="packetsExportForm">
+                            <div class="mb-3">
+                                <label class="form-label">Export Format</label>
+                                <select class="form-select" id="packetsExportFormat">
+                                    <option value="csv">CSV (Comma Separated)</option>
+                                    <option value="json">JSON (JavaScript Object)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Include Filters</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="exportCurrentFilters" checked>
+                                    <label class="form-check-label" for="exportCurrentFilters">
+                                        Apply current filters
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Maximum Records</label>
+                                <select class="form-select" id="packetsExportLimit">
+                                    <option value="1000">1,000 records</option>
+                                    <option value="5000" selected>5,000 records</option>
+                                    <option value="10000">10,000 records</option>
+                                    <option value="all">All records</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="performPacketsExport()">
+                            <i class="fas fa-download"></i> Export Packets
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(exportModal);
+    new bootstrap.Modal(document.getElementById('packetsExportModal')).show();
+}
+
+function performPacketsExport() {
+    const format = document.getElementById('packetsExportFormat').value;
+    const includeFilters = document.getElementById('exportCurrentFilters').checked;
+    const limit = document.getElementById('packetsExportLimit').value;
+    
+    const exportBtn = event.target;
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+    exportBtn.disabled = true;
+    
+    // Build export URL with parameters
+    const params = new URLSearchParams({
+        format: format,
+        include_packets: 'true',
+        include_flows: 'false',
+        include_stats: 'false',
+        limit: limit
+    });
+    
+    if (includeFilters) {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('protocol') && urlParams.get('protocol') !== 'all') {
+            params.append('protocol', urlParams.get('protocol'));
+        }
+        if (urlParams.get('ip')) {
+            params.append('ip', urlParams.get('ip'));
+        }
+        if (urlParams.get('time_range')) {
+            params.append('time_range', urlParams.get('time_range'));
+        }
+    }
+    
+    // Create download link
+    const downloadUrl = `/api/export-data?${params.toString()}`;
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `packetsight_packets_${new Date().toISOString().split('T')[0]}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Close modal and reset button
+    setTimeout(() => {
+        bootstrap.Modal.getInstance(document.getElementById('packetsExportModal')).hide();
+        exportBtn.innerHTML = '<i class="fas fa-download"></i> Export Packets';
+        exportBtn.disabled = false;
+        showToast('Export', 'Packets exported successfully', 'success');
+    }, 1000);
+}
+
+function exportPacketDetails() {
+    if (currentPacketData) {
+        showToast('Export', 'Exporting packet details...', 'success');
+        // Implementation would download packet details as JSON/CSV
+    }
+}
+
+// Auto-refresh every 60 seconds
+setInterval(function() {
+    if (!document.querySelector('.modal.show')) {
+        // Only refresh if no modal is open
+        const url = new URL(window.location);
+        url.searchParams.set('_t', Date.now()); // Add timestamp to force refresh
+        fetch(url.toString(), { 
+            headers: { 'X-Requested-With': 'XMLHttpRequest' } 
+        }).then(() => {
+            // Optional: Update page content without full reload
+        });
+    }
+}, 60000);
+</script>
+{% endblock %}

@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Upload PCAP File - PacketSight{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-upload text-primary me-2"></i>
+                    Upload PCAP File
+                </h1>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Upload</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <!-- Upload Card -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-file-upload me-2"></i>
+                        PCAP File Upload
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Supported Formats:</strong> .pcap, .pcapng, .cap files from Wireshark, tcpdump, or other network capture tools.
+                        <br>
+                        <strong>File Size Limit:</strong> Maximum 10,000 packets per file to ensure optimal performance.
+                    </div>
+
+                    <!-- Upload Form -->
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <label for="pcapFile" class="form-label">
+                                <i class="fas fa-file me-1"></i>
+                                Select PCAP File
+                            </label>
+                            <input type="file" class="form-control" id="pcapFile" name="file" 
+                                   accept=".pcap,.pcapng,.cap" required>
+                            <div class="form-text">
+                                Choose a packet capture file to analyze. The file will be processed and data imported into the analyzer.
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="maxPackets" class="form-label">
+                                <i class="fas fa-sliders-h me-1"></i>
+                                Maximum Packets to Process
+                            </label>
+                            <input type="number" class="form-control" id="maxPackets" name="max_packets" 
+                                   value="10000" min="100" max="10000" step="100">
+                            <div class="form-text">
+                                Limit the number of packets to process (100-10,000). Lower values process faster.
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg" id="uploadBtn">
+                                <i class="fas fa-upload me-2"></i>
+                                Upload and Parse File
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Progress Bar -->
+                    <div id="uploadProgress" class="mt-4" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Processing file...</span>
+                            <span id="progressText" class="text-muted">0%</span>
+                        </div>
+                        <div class="progress">
+                            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- File Info -->
+                    <div id="fileInfo" class="mt-4" style="display: none;">
+                        <h6 class="text-muted mb-3">
+                            <i class="fas fa-info-circle me-1"></i>
+                            File Information
+                        </h6>
+                        <div class="row" id="fileInfoContent">
+                            <!-- File info will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div id="uploadResults" class="mt-4" style="display: none;">
+                        <h6 class="text-success mb-3">
+                            <i class="fas fa-check-circle me-1"></i>
+                            Upload Results
+                        </h6>
+                        <div id="resultsContent">
+                            <!-- Results will be populated here -->
+                        </div>
+                        <div class="mt-3">
+                            <a href="{{ url_for('packets') }}" class="btn btn-success me-2">
+                                <i class="fas fa-eye me-1"></i>
+                                View Packets
+                            </a>
+                            <a href="{{ url_for('flows') }}" class="btn btn-outline-success me-2">
+                                <i class="fas fa-stream me-1"></i>
+                                View Flows
+                            </a>
+                            <a href="{{ url_for('analytics') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-chart-line me-1"></i>
+                                View Analytics
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help Card -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-question-circle me-2"></i>
+                        How to Use
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Creating PCAP Files</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-chevron-right text-muted me-2"></i>Use Wireshark to capture network traffic</li>
+                                <li><i class="fas fa-chevron-right text-muted me-2"></i>Use tcpdump: <code>tcpdump -w capture.pcap</code></li>
+                                <li><i class="fas fa-chevron-right text-muted me-2"></i>Export from network monitoring tools</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-primary">What Gets Analyzed</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-chevron-right text-muted me-2"></i>Network packets and protocols</li>
+                                <li><i class="fas fa-chevron-right text-muted me-2"></i>Traffic flows and connections</li>
+                                <li><i class="fas fa-chevron-right text-muted me-2"></i>DNS queries and HTTP transactions</li>
+                                <li><i class="fas fa-chevron-right text-muted me-2"></i>Security indicators and anomalies</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadForm = document.getElementById('uploadForm');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const fileInfo = document.getElementById('fileInfo');
+    const uploadResults = document.getElementById('uploadResults');
+    const pcapFile = document.getElementById('pcapFile');
+
+    // File selection handler
+    pcapFile.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            validateFile(file);
+        }
+    });
+
+    // Form submission handler
+    uploadForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const file = pcapFile.files[0];
+        if (!file) {
+            showToast('Error', 'Please select a file to upload', 'error');
+            return;
+        }
+
+        uploadFile(file);
+    });
+
+    function validateFile(file) {
+        const allowedTypes = ['.pcap', '.pcapng', '.cap'];
+        const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+        
+        if (!allowedTypes.includes(fileExt)) {
+            showToast('Error', `Invalid file type. Supported formats: ${allowedTypes.join(', ')}`, 'error');
+            pcapFile.value = '';
+            return false;
+        }
+
+        // Show basic file info
+        displayFileBasicInfo(file);
+        return true;
+    }
+
+    function displayFileBasicInfo(file) {
+        const fileInfoContent = document.getElementById('fileInfoContent');
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        
+        fileInfoContent.innerHTML = `
+            <div class="col-md-6">
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">File Name:</span>
+                    <span class="fw-bold">${file.name}</span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">File Size:</span>
+                    <span class="fw-bold">${fileSizeMB} MB</span>
+                </div>
+            </div>
+        `;
+        
+        fileInfo.style.display = 'block';
+    }
+
+    function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('max_packets', document.getElementById('maxPackets').value);
+
+        // Show progress
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+        uploadProgress.style.display = 'block';
+        uploadResults.style.display = 'none';
+
+        // Simulate progress (since we can't track actual upload progress easily)
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+            
+            progressBar.style.width = progress + '%';
+            progressText.textContent = Math.round(progress) + '%';
+        }, 500);
+
+        // Upload file
+        fetch('/api/upload-pcap', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            progressText.textContent = '100%';
+            
+            setTimeout(() => {
+                uploadProgress.style.display = 'none';
+                
+                if (data.success) {
+                    showUploadResults(data);
+                    showToast('Success', data.message, 'success');
+                } else {
+                    showToast('Error', data.message, 'error');
+                }
+                
+                resetForm();
+            }, 1000);
+        })
+        .catch(error => {
+            clearInterval(progressInterval);
+            uploadProgress.style.display = 'none';
+            showToast('Error', 'Upload failed: ' + error.message, 'error');
+            resetForm();
+        });
+    }
+
+    function showUploadResults(data) {
+        const resultsContent = document.getElementById('resultsContent');
+        const fileInfo = data.file_info;
+        const parseResults = data.parse_results;
+        
+        let protocolsHtml = '';
+        if (parseResults.protocols) {
+            for (const [protocol, count] of Object.entries(parseResults.protocols)) {
+                protocolsHtml += `
+                    <div class="col-6 col-md-3 mb-2">
+                        <div class="text-center">
+                            <div class="fw-bold text-primary">${count}</div>
+                            <div class="small text-muted">${protocol}</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        resultsContent.innerHTML = `
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="h4 text-success mb-0">${parseResults.parsed_packets}</div>
+                        <div class="small text-muted">Packets Parsed</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="h4 text-info mb-0">${fileInfo.packet_count}</div>
+                        <div class="small text-muted">Total Packets</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="h4 text-warning mb-0">${fileInfo.file_size_mb}</div>
+                        <div class="small text-muted">File Size (MB)</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="h4 text-secondary mb-0">${parseResults.duration.toFixed(1)}s</div>
+                        <div class="small text-muted">Duration</div>
+                    </div>
+                </div>
+            </div>
+            
+            ${protocolsHtml ? `
+                <div class="mb-3">
+                    <h6 class="text-muted mb-2">Protocol Distribution</h6>
+                    <div class="row">
+                        ${protocolsHtml}
+                    </div>
+                </div>
+            ` : ''}
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Start Time:</span>
+                        <span class="fw-bold">${new Date(parseResults.start_time).toLocaleString()}</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">End Time:</span>
+                        <span class="fw-bold">${new Date(parseResults.end_time).toLocaleString()}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        uploadResults.style.display = 'block';
+    }
+
+    function resetForm() {
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Upload and Parse File';
+    }
+});
+</script>
+{% endblock %}

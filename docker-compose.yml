@@ -1,0 +1,82 @@
+# PacketSight - Network Traffic Analyzer
+# Docker Compose configuration for easy deployment
+# Author: sharondelya
+
+version: '3.8'
+
+services:
+  packetsight:
+    build: .
+    container_name: packetsight-app
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://packetsight:packetsight123@db:5432/packetsight
+      - SESSION_SECRET=your-super-secret-key-change-this-in-production
+    volumes:
+      - ./instance:/app/instance
+      - ./logs:/app/logs
+    depends_on:
+      - db
+    networks:
+      - packetsight-network
+    restart: unless-stopped
+    # Enable packet capture capabilities
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    # For network monitoring
+    network_mode: host
+    
+  db:
+    image: postgres:15-alpine
+    container_name: packetsight-db
+    environment:
+      - POSTGRES_DB=packetsight
+      - POSTGRES_USER=packetsight
+      - POSTGRES_PASSWORD=packetsight123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - packetsight-network
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+
+  # Optional: Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: packetsight-redis
+    networks:
+      - packetsight-network
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: packetsight-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - packetsight
+    networks:
+      - packetsight-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  packetsight-network:
+    driver: bridge

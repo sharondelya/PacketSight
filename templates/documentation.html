@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+
+{% block title %}Documentation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-book me-2"></i>PacketSight Documentation</h1>
+            <a href="https://github.com/sharondelya/PacketSight" target="_blank" class="btn btn-outline-primary">
+                <i class="fab fa-github me-2"></i>View on GitHub
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-list me-2"></i>Table of Contents</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    <a href="#overview" class="list-group-item list-group-item-action">Overview</a>
+                    <a href="#features" class="list-group-item list-group-item-action">Features</a>
+                    <a href="#installation" class="list-group-item list-group-item-action">Installation</a>
+                    <a href="#usage" class="list-group-item list-group-item-action">Usage Guide</a>
+                    <a href="#api" class="list-group-item list-group-item-action">API Reference</a>
+                    <a href="#troubleshooting" class="list-group-item list-group-item-action">Troubleshooting</a>
+                    <a href="#contributing" class="list-group-item list-group-item-action">Contributing</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-9">
+        <div class="documentation-content">
+            
+            <!-- Overview Section -->
+            <section id="overview" class="mb-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-info-circle me-2"></i>Overview</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="lead">PacketSight is a professional network traffic analyzer built with Flask, designed for real-time monitoring and analysis of network packets and flows.</p>
+                        
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <h5>Key Technologies</h5>
+                                <ul class="list-unstyled">
+                                    <li><i class="fab fa-python me-2 text-primary"></i>Python Flask Backend</li>
+                                    <li><i class="fas fa-chart-line me-2 text-success"></i>Chart.js for Visualizations</li>
+                                    <li><i class="fas fa-database me-2 text-info"></i>SQLite Database</li>
+                                    <li><i class="fab fa-bootstrap me-2 text-purple"></i>Bootstrap 5 UI</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Supported Protocols</h5>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <span class="badge bg-primary">TCP</span>
+                                    <span class="badge bg-success">UDP</span>
+                                    <span class="badge bg-info">HTTP/HTTPS</span>
+                                    <span class="badge bg-warning text-dark">DNS</span>
+                                    <span class="badge bg-danger">ICMP</span>
+                                    <span class="badge bg-secondary">IP</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Features Section -->
+            <section id="features" class="mb-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-star me-2"></i>Features</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Real-time Monitoring</h5>
+                                <ul>
+                                    <li>Live packet capture and analysis</li>
+                                    <li>Real-time traffic visualization</li>
+                                    <li>Protocol distribution charts</li>
+                                    <li>Network flow tracking</li>
+                                </ul>
+                                
+                                <h5>Data Export</h5>
+                                <ul>
+                                    <li>CSV and JSON export formats</li>
+                                    <li>Filtered data export</li>
+                                    <li>Analytics report generation</li>
+                                    <li>Time-based data filtering</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Analysis Tools</h5>
+                                <ul>
+                                    <li>Protocol statistics and analysis</li>
+                                    <li>Geographic IP analysis</li>
+                                    <li>Traffic pattern recognition</li>
+                                    <li>Flow duration analysis</li>
+                                </ul>
+                                
+                                <h5>File Support</h5>
+                                <ul>
+                                    <li>PCAP file upload and parsing</li>
+                                    <li>Multiple file format support</li>
+                                    <li>Batch processing capabilities</li>
+                                    <li>Error handling and validation</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Installation Section -->
+            <section id="installation" class="mb-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-download me-2"></i>Installation</h3>
+                    </div>
+                    <div class="card-body">
+                        <h5>Prerequisites</h5>
+                        <ul>
+                            <li>Python 3.8 or higher</li>
+                            <li>pip package manager</li>
+                            <li>Administrative privileges (for packet capture)</li>
+                        </ul>
+                        
+                        <h5>Installation Steps</h5>
+                        <div class="code-block">
+                            <pre><code># Clone the repository
+git clone https://github.com/sharondelya/PacketSight.git
+cd PacketSight
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Initialize the database
+python init_db.py
+
+# Run the application
+python app.py</code></pre>
+                        </div>
+                        
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Note:</strong> On Windows, you may need to run the application as Administrator for packet capture functionality.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Usage Guide Section -->
+            <section id="usage" class="mb-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-play me-2"></i>Usage Guide</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Dashboard</h5>
+                                <p>The main dashboard provides an overview of network activity:</p>
+                                <ul>
+                                    <li>Real-time traffic charts</li>
+                                    <li>Protocol distribution</li>
+                                    <li>Recent activity feed</li>
+                                    <li>Quick statistics</li>
+                                </ul>
+                                
+                                <h5>Packet Analysis</h5>
+                                <p>View detailed packet information:</p>
+                                <ul>
+                                    <li>Source and destination IPs</li>
+                                    <li>Protocol information</li>
+                                    <li>Packet size and timestamps</li>
+                                    <li>Filtering and search capabilities</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Flow Tracking</h5>
+                                <p>Monitor network flows and connections:</p>
+                                <ul>
+                                    <li>Flow duration and statistics</li>
+                                    <li>Bandwidth utilization</li>
+                                    <li>Connection patterns</li>
+                                    <li>Flow export functionality</li>
+                                </ul>
+                                
+                                <h5>Analytics</h5>
+                                <p>Advanced analysis and reporting:</p>
+                                <ul>
+                                    <li>Time-series analysis</li>
+                                    <li>Geographic visualization</li>
+                                    <li>Protocol trends</li>
+                                    <li>Export and reporting tools</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- API Reference Section -->
+            <section id="api" class="mb-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-code me-2"></i>API Reference</h3>
+                    </div>
+                    <div class="card-body">
+                        <h5>Core Endpoints</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Endpoint</th>
+                                        <th>Method</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>/api/stats</code></td>
+                                        <td><span class="badge bg-success">GET</span></td>
+                                        <td>Get general statistics</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>/api/protocol-distribution</code></td>
+                                        <td><span class="badge bg-success">GET</span></td>
+                                        <td>Get protocol distribution data</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>/api/traffic-timeline</code></td>
+                                        <td><span class="badge bg-success">GET</span></td>
+                                        <td>Get traffic timeline data</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>/api/export-data</code></td>
+                                        <td><span class="badge bg-success">GET</span></td>
+                                        <td>Export data in various formats</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>/api/upload-pcap</code></td>
+                                        <td><span class="badge bg-primary">POST</span></td>
+                                        <td>Upload and parse PCAP files</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>/api/start-capture</code></td>
+                                        <td><span class="badge bg-primary">POST</span></td>
+                                        <td>Start live packet capture</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>/api/stop-capture</code></td>
+                                        <td><span class="badge bg-primary">POST</span></td>
+                                        <td>Stop live packet capture</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Troubleshooting Section -->
+            <section id="troubleshooting" class="mb-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-wrench me-2"></i>Troubleshooting</h3>
+                    </div>
+                    <div class="card-body">
+                        <h5>Common Issues</h5>
+                        
+                        <div class="accordion" id="troubleshootingAccordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#issue1">
+                                        Packet capture not working
+                                    </button>
+                                </h2>
+                                <div id="issue1" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                                    <div class="accordion-body">
+                                        <ul>
+                                            <li>Ensure the application is run with administrative privileges</li>
+                                            <li>Check if the network interface is available</li>
+                                            <li>Verify that no other packet capture tools are running</li>
+                                            <li>Try using a different network interface</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#issue2">
+                                        PCAP file upload fails
+                                    </button>
+                                </h2>
+                                <div id="issue2" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                                    <div class="accordion-body">
+                                        <ul>
+                                            <li>Check file format (must be valid PCAP)</li>
+                                            <li>Ensure file size is within limits</li>
+                                            <li>Verify file is not corrupted</li>
+                                            <li>Check database permissions and space</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#issue3">
+                                        Charts not displaying
+                                    </button>
+                                </h2>
+                                <div id="issue3" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                                    <div class="accordion-body">
+                                        <ul>
+                                            <li>Check browser console for JavaScript errors</li>
+                                            <li>Ensure Chart.js library is loaded</li>
+                                            <li>Verify API endpoints are returning data</li>
+                                            <li>Clear browser cache and reload</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Contributing Section -->
+            <section id="contributing" class="mb-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-users me-2"></i>Contributing</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>We welcome contributions to PacketSight! Here's how you can help:</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Development</h5>
+                                <ul>
+                                    <li>Fork the repository on GitHub</li>
+                                    <li>Create a feature branch</li>
+                                    <li>Make your changes with tests</li>
+                                    <li>Submit a pull request</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Reporting Issues</h5>
+                                <ul>
+                                    <li>Use GitHub Issues for bug reports</li>
+                                    <li>Provide detailed reproduction steps</li>
+                                    <li>Include system information</li>
+                                    <li>Attach relevant log files</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-primary mt-3">
+                            <i class="fab fa-github me-2"></i>
+                            Visit our <a href="https://github.com/sharondelya/PacketSight" target="_blank" class="alert-link">GitHub repository</a> to get started with contributing.
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<style>
+.documentation-content {
+    scroll-behavior: smooth;
+}
+
+.code-block {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.code-block pre {
+    margin: 0;
+    color: #495057;
+}
+
+.code-block code {
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+}
+
+.list-group-item-action:hover {
+    background-color: #f8f9fa;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.text-purple {
+    color: #6f42c1 !important;
+}
+</style>
+
+<script>
+// Smooth scrolling for navigation links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
+    });
+});
+
+// Highlight active section in navigation
+window.addEventListener('scroll', function() {
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.list-group-item-action');
+    
+    let current = '';
+    sections.forEach(section => {
+        const sectionTop = section.offsetTop - 100;
+        if (window.pageYOffset >= sectionTop) {
+            current = section.getAttribute('id');
+        }
+    });
+    
+    navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+            link.classList.add('active');
+        }
+    });
+});
+</script>
+{% endblock %}

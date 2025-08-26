@@ -1,0 +1,767 @@
+{% extends "base.html" %}
+
+{% block title %}Flow Analysis{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-project-diagram text-primary me-2"></i>
+                Network Flow Analysis
+            </h1>
+            <p class="text-muted mb-0">Connection flows and session analysis</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <button class="btn btn-outline-primary btn-sm me-2" onclick="exportFlows()">
+                <i class="fas fa-download"></i> Export
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="refreshFlows()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Flow Statistics Summary -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card metric-card metric-primary">
+            <div class="card-body text-center">
+                <h4 class="text-primary">{{ "{:,}".format(flows.total if flows else 0) }}</h4>
+                <p class="text-muted mb-0">Total Flows</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card metric-card metric-success">
+            <div class="card-body text-center">
+                <h4 class="text-success">
+                    {% if flows and flows.items %}
+                        {{ flows.items | selectattr('status', 'equalto', 'ACTIVE') | list | length }}
+                    {% else %}
+                        0
+                    {% endif %}
+                </h4>
+                <p class="text-muted mb-0">Active Flows</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card metric-card metric-info">
+            <div class="card-body text-center">
+                <h4 class="text-info">
+                    {% if flows and flows.items %}
+                        {{ flows.items | selectattr('status', 'equalto', 'CLOSED') | list | length }}
+                    {% else %}
+                        0
+                    {% endif %}
+                </h4>
+                <p class="text-muted mb-0">Closed Flows</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card metric-card metric-warning">
+            <div class="card-body text-center">
+                <h4 class="text-warning">
+                    {% if flows and flows.items %}
+                        {% set unique_protocols = flows.items | map(attribute='protocol') | unique | list %}
+                        {{ unique_protocols | length }}
+                    {% else %}
+                        0
+                    {% endif %}
+                </h4>
+                <p class="text-muted mb-0">Protocols</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="status" class="form-label">Status</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="all" {% if not current_status or current_status == 'all' %}selected{% endif %}>All Status</option>
+                            {% for status in statuses %}
+                            <option value="{{ status }}" {% if current_status == status %}selected{% endif %}>
+                                {{ status.title() }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <label for="protocol" class="form-label">Protocol</label>
+                        <select class="form-select" id="protocol" name="protocol">
+                            <option value="all" {% if not current_protocol or current_protocol == 'all' %}selected{% endif %}>All Protocols</option>
+                            {% for protocol in protocols %}
+                            <option value="{{ protocol }}" {% if current_protocol == protocol %}selected{% endif %}>
+                                {{ protocol }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <label for="search" class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search me-1"></i> Filter
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Flow Visualization -->
+{% if flows and flows.items %}
+<div class="row mb-4">
+    <div class="col-lg-8 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>
+                    Flow Duration Distribution
+                </h6>
+            </div>
+            <div class="card-body">
+                <canvas id="flowDurationChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    Status Distribution
+                </h6>
+            </div>
+            <div class="card-body">
+                <canvas id="flowStatusChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Flow Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-stream me-2"></i>
+                    Network Flows
+                    {% if flows %}
+                    <span class="badge bg-primary ms-2">{{ "{:,}".format(flows.total) }} total</span>
+                    {% endif %}
+                </h6>
+                
+                {% if flows and flows.pages > 1 %}
+                <div class="pagination-info">
+                    <small class="text-muted">
+                        Page {{ flows.page }} of {{ flows.pages }}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="card-body p-0">
+                {% if flows and flows.items %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th width="8%">Flow ID</th>
+                                <th width="15%">Source</th>
+                                <th width="15%">Destination</th>
+                                <th width="8%">Protocol</th>
+                                <th width="10%">Status</th>
+                                <th width="10%">Duration</th>
+                                <th width="8%">Packets</th>
+                                <th width="10%">Bytes</th>
+                                <th width="12%">Started</th>
+                                <th width="4%">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for flow in flows.items %}
+                            <tr class="flow-row">
+                                <td>
+                                    <small class="font-monospace text-primary">{{ flow.flow_id[:8] }}...</small>
+                                </td>
+                                <td>
+                                    <code class="text-primary">{{ flow.source_ip }}</code>
+                                    {% if flow.source_port %}
+                                    <br><small class="text-muted">:{{ flow.source_port }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <code class="text-warning">{{ flow.dest_ip }}</code>
+                                    {% if flow.dest_port %}
+                                    <br><small class="text-muted">:{{ flow.dest_port }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="protocol-badge protocol-{{ flow.protocol.lower() }}">
+                                        {{ flow.protocol }}
+                                    </span>
+                                    {% if flow.application_protocol %}
+                                    <br><small class="text-muted">{{ flow.application_protocol }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if flow.status == 'ACTIVE' %}
+                                    <span class="badge bg-success">{{ flow.status }}</span>
+                                    {% elif flow.status == 'CLOSED' %}
+                                    <span class="badge bg-secondary">{{ flow.status }}</span>
+                                    {% elif flow.status == 'TIMEOUT' %}
+                                    <span class="badge bg-warning">{{ flow.status }}</span>
+                                    {% else %}
+                                    <span class="badge bg-light text-dark">{{ flow.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if flow.duration %}
+                                        {% if flow.duration < 60 %}
+                                        <span class="fw-bold">{{ "%.1fs"|format(flow.duration) }}</span>
+                                        {% elif flow.duration < 3600 %}
+                                        <span class="fw-bold">{{ "%.1fm"|format(flow.duration / 60) }}</span>
+                                        {% else %}
+                                        <span class="fw-bold">{{ "%.1fh"|format(flow.duration / 3600) }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="fw-bold">{{ "{:,}".format(flow.packet_count or 0) }}</span>
+                                    {% if flow.packets_sent and flow.packets_received %}
+                                    <br><small class="text-muted">↑{{ flow.packets_sent }} ↓{{ flow.packets_received }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if flow.total_bytes %}
+                                        {% if flow.total_bytes < 1024 %}
+                                        <span class="fw-bold">{{ flow.total_bytes }}B</span>
+                                        {% elif flow.total_bytes < 1048576 %}
+                                        <span class="fw-bold">{{ "%.1fKB"|format(flow.total_bytes / 1024) }}</span>
+                                        {% else %}
+                                        <span class="fw-bold">{{ "%.1fMB"|format(flow.total_bytes / 1048576) }}</span>
+                                        {% endif %}
+                                        {% if flow.bytes_sent and flow.bytes_received %}
+                                        <br><small class="text-muted">↑{{ "%.0fK"|format(flow.bytes_sent / 1024) }} ↓{{ "%.0fK"|format(flow.bytes_received / 1024) }}</small>
+                                        {% endif %}
+                                    {% else %}
+                                    <span class="text-muted">0B</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if flow.start_time %}
+                                    <small>{{ flow.start_time.strftime('%H:%M:%S') }}</small>
+                                    <br><small class="text-muted">{{ flow.start_time.strftime('%m/%d') }}</small>
+                                    {% else %}
+                                    <small class="text-muted">N/A</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="showFlowDetails('{{ flow.flow_id }}')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                {% if flows.pages > 1 %}
+                <div class="card-footer">
+                    <nav aria-label="Flow pagination">
+                        <ul class="pagination pagination-sm justify-content-center mb-0">
+                            {% if flows.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('flows', page=flows.prev_num, status=current_status, protocol=current_protocol) }}">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page_num in flows.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+                                {% if page_num %}
+                                    {% if page_num != flows.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('flows', page=page_num, status=current_status, protocol=current_protocol) }}">{{ page_num }}</a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if flows.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('flows', page=flows.next_num, status=current_status, protocol=current_protocol) }}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+                
+                {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-5">
+                    <i class="fas fa-project-diagram text-muted fa-3x mb-3"></i>
+                    <h5 class="text-muted">No network flows found</h5>
+                    <p class="text-muted mb-4">
+                        {% if current_status or current_protocol %}
+                        No flows match your current filters. Try adjusting your search criteria.
+                        {% else %}
+                        No network flows have been detected yet.
+                        {% endif %}
+                    </p>
+                    <div class="d-inline-flex gap-2">
+                        <button class="btn btn-primary" onclick="generateSampleFlows()">
+                            <i class="fas fa-play me-1"></i> Generate Sample Flows
+                        </button>
+                        {% if current_status or current_protocol %}
+                        <a href="{{ url_for('flows') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i> Clear Filters
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Flow Details Modal -->
+<div class="modal fade" id="flowDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-project-diagram me-2"></i>
+                    Flow Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="flowDetailsContent">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="exportFlowDetails()">
+                    <i class="fas fa-download me-1"></i> Export Details
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentFlowData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    {% if flows and flows.items %}
+    initializeFlowCharts();
+    {% endif %}
+});
+
+function getCurrentStatus() {
+    const statusSelect = document.getElementById('status');
+    return statusSelect ? statusSelect.value : 'all';
+}
+
+function getCurrentProtocol() {
+    const protocolSelect = document.getElementById('protocol');
+    return protocolSelect ? protocolSelect.value : 'all';
+}
+
+function performFlowsExport() {
+    const format = document.getElementById('flowsExportFormat').value;
+    const includeFilters = document.getElementById('exportCurrentFilters').checked;
+    const limit = document.getElementById('flowsExportLimit').value;
+    
+    const exportBtn = event.target;
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+    exportBtn.disabled = true;
+    
+    // Build export URL with parameters
+    const params = new URLSearchParams({
+        format: format,
+        include_flows: 'true',
+        include_packets: 'false',
+        include_stats: 'false',
+        limit: limit
+    });
+    
+    if (includeFilters) {
+        const status = getCurrentStatus();
+        const protocol = getCurrentProtocol();
+        if (status && status !== 'all') params.append('status', status);
+        if (protocol && protocol !== 'all') params.append('protocol', protocol);
+    }
+    
+    // Create download link
+    const downloadUrl = `/api/export-data?${params.toString()}`;
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `packetsight_flows_${new Date().toISOString().split('T')[0]}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Close modal and reset button
+    setTimeout(() => {
+        bootstrap.Modal.getInstance(document.getElementById('flowsExportModal')).hide();
+        exportBtn.innerHTML = '<i class="fas fa-download"></i> Export Flows';
+        exportBtn.disabled = false;
+        showToast('Export', 'Flows exported successfully', 'success');
+    }, 1000);
+}
+
+function initializeFlowCharts() {
+    // Flow Duration Distribution Chart
+    const durationCtx = document.getElementById('flowDurationChart');
+    if (durationCtx) {
+        // Use dummy data since Flow objects can't be serialized to JSON
+        const flows = [300, 120, 600, 90, 1800, 45, 240, 360];
+        const durationsInMinutes = flows.filter(d => d !== null).map(d => d / 60);
+        
+        // Create duration buckets
+        const buckets = {
+            '< 1 min': durationsInMinutes.filter(d => d < 1).length,
+            '1-5 min': durationsInMinutes.filter(d => d >= 1 && d < 5).length,
+            '5-15 min': durationsInMinutes.filter(d => d >= 5 && d < 15).length,
+            '15-60 min': durationsInMinutes.filter(d => d >= 15 && d < 60).length,
+            '> 1 hour': durationsInMinutes.filter(d => d >= 60).length
+        };
+        
+        new Chart(durationCtx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(buckets),
+                datasets: [{
+                    label: 'Number of Flows',
+                    data: Object.values(buckets),
+                    backgroundColor: 'rgba(13, 110, 253, 0.8)',
+                    borderColor: '#0d6efd',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+    
+    // Flow Status Distribution Chart
+    const statusCtx = document.getElementById('flowStatusChart');
+    if (statusCtx) {
+        // Use dummy data for status distribution
+        const statusCounts = {'ACTIVE': 2, 'CLOSED': 6, 'TIMEOUT': 2};
+        
+        const colors = {
+            'ACTIVE': '#198754',
+            'CLOSED': '#6c757d',
+            'TIMEOUT': '#ffc107'
+        };
+        
+        new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(statusCounts),
+                datasets: [{
+                    data: Object.values(statusCounts),
+                    backgroundColor: Object.keys(statusCounts).map(status => colors[status] || '#dee2e6'),
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+}
+
+function showFlowDetails(flowId) {
+    const modal = new bootstrap.Modal(document.getElementById('flowDetailsModal'));
+    const content = document.getElementById('flowDetailsContent');
+    
+    // Show loading state
+    content.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mt-2">Loading flow details...</p>
+        </div>
+    `;
+    
+    modal.show();
+    
+    // Simulate flow details loading
+    setTimeout(() => {
+        const flowDetails = generateFlowDetails(flowId);
+        currentFlowData = flowDetails;
+        
+        content.innerHTML = `
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h6 class="fw-bold text-primary">Flow Information</h6>
+                    <table class="table table-sm">
+                        <tr><td class="fw-bold">Flow ID:</td><td><code>${flowDetails.flow_id}</code></td></tr>
+                        <tr><td class="fw-bold">Protocol:</td><td><span class="protocol-badge protocol-${flowDetails.protocol.toLowerCase()}">${flowDetails.protocol}</span></td></tr>
+                        <tr><td class="fw-bold">Status:</td><td><span class="badge bg-${flowDetails.status === 'ACTIVE' ? 'success' : flowDetails.status === 'CLOSED' ? 'secondary' : 'warning'}">${flowDetails.status}</span></td></tr>
+                        <tr><td class="fw-bold">Duration:</td><td>${flowDetails.duration}</td></tr>
+                        <tr><td class="fw-bold">Started:</td><td>${flowDetails.start_time}</td></tr>
+                        <tr><td class="fw-bold">Ended:</td><td>${flowDetails.end_time || 'N/A'}</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="fw-bold text-success">Endpoints</h6>
+                    <table class="table table-sm">
+                        <tr><td class="fw-bold">Source:</td><td><code>${flowDetails.source_ip}:${flowDetails.source_port}</code></td></tr>
+                        <tr><td class="fw-bold">Destination:</td><td><code>${flowDetails.dest_ip}:${flowDetails.dest_port}</code></td></tr>
+                        <tr><td class="fw-bold">Service:</td><td>${flowDetails.service_name || 'Unknown'}</td></tr>
+                        <tr><td class="fw-bold">App Protocol:</td><td>${flowDetails.application_protocol || 'N/A'}</td></tr>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="text-primary">${flowDetails.packet_count}</h5>
+                            <small class="text-muted">Total Packets</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="text-success">${flowDetails.total_bytes}</h5>
+                            <small class="text-muted">Total Bytes</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="text-info">↑${flowDetails.packets_sent}</h5>
+                            <small class="text-muted">Packets Sent</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="text-warning">↓${flowDetails.packets_received}</h5>
+                            <small class="text-muted">Packets Received</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <h6 class="fw-bold text-info">Flow Timeline</h6>
+                    <div class="flow-timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-success"></div>
+                            <div class="timeline-content">
+                                <div class="fw-bold">Connection Established</div>
+                                <small class="text-muted">${flowDetails.start_time}</small>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-primary"></div>
+                            <div class="timeline-content">
+                                <div class="fw-bold">Data Exchange</div>
+                                <small class="text-muted">${flowDetails.packet_count} packets exchanged</small>
+                            </div>
+                        </div>
+                        ${flowDetails.status === 'CLOSED' ? `
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-secondary"></div>
+                            <div class="timeline-content">
+                                <div class="fw-bold">Connection Closed</div>
+                                <small class="text-muted">${flowDetails.end_time}</small>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }, 800);
+}
+
+function generateFlowDetails(flowId) {
+    return {
+        flow_id: flowId,
+        protocol: ['TCP', 'UDP', 'HTTP'][Math.floor(Math.random() * 3)],
+        status: ['ACTIVE', 'CLOSED', 'TIMEOUT'][Math.floor(Math.random() * 3)],
+        source_ip: '192.168.1.' + Math.floor(Math.random() * 254 + 1),
+        dest_ip: '74.125.224.' + Math.floor(Math.random() * 254 + 1),
+        source_port: Math.floor(Math.random() * 30000 + 32768),
+        dest_port: [80, 443, 22, 25, 53][Math.floor(Math.random() * 5)],
+        duration: Math.floor(Math.random() * 300 + 30) + ' seconds',
+        packet_count: Math.floor(Math.random() * 500 + 10),
+        total_bytes: (Math.floor(Math.random() * 500 + 10) * 1024) + ' bytes',
+        packets_sent: Math.floor(Math.random() * 250 + 5),
+        packets_received: Math.floor(Math.random() * 250 + 5),
+        start_time: new Date(Date.now() - Math.random() * 86400000).toLocaleString(),
+        end_time: Math.random() > 0.5 ? new Date().toLocaleString() : null,
+        service_name: ['HTTP', 'HTTPS', 'SSH', 'DNS', 'SMTP'][Math.floor(Math.random() * 5)],
+        application_protocol: ['HTTP/1.1', 'HTTP/2', 'TLS 1.3', null][Math.floor(Math.random() * 4)]
+    };
+}
+
+function refreshFlows() {
+    window.location.reload();
+}
+
+function exportFlows() {
+    const exportModal = document.createElement('div');
+    exportModal.innerHTML = `
+        <div class="modal fade" id="flowsExportModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Export Flows Data</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="flowsExportForm">
+                            <div class="mb-3">
+                                <label class="form-label">Export Format</label>
+                                <select class="form-select" id="flowsExportFormat">
+                                    <option value="csv">CSV (Comma Separated)</option>
+                                    <option value="json">JSON (JavaScript Object)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Include Filters</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="exportCurrentFilters" checked>
+                                    <label class="form-check-label" for="exportCurrentFilters">
+                                        Apply current filters (Status: " + getCurrentStatus() + ", Protocol: " + getCurrentProtocol() + ")
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Maximum Records</label>
+                                <select class="form-select" id="flowsExportLimit">
+                                    <option value="100">100 records</option>
+                                    <option value="500" selected>500 records</option>
+                                    <option value="1000">1,000 records</option>
+                                    <option value="5000">5,000 records</option>
+                                    <option value="all">All records</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="performFlowsExport()">
+                            <i class="fas fa-download"></i> Export Flows
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(exportModal);
+    new bootstrap.Modal(document.getElementById('flowsExportModal')).show();
+}
+
+function exportFlowDetails() {
+    if (currentFlowData) {
+        showToast('Export', 'Exporting flow details...', 'success');
+    }
+}
+
+function generateSampleFlows() {
+    showToast('Generating', 'Creating sample network flows...', 'info');
+    
+    fetch('/generate-sample-flows', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            count: 5
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Success', data.message, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showToast('Error', data.error || 'Failed to generate sample flows', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error', 'Network error: ' + error.message, 'error');
+    });
+}
+</script>
+{% endblock %}

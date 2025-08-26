@@ -1,0 +1,712 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-header mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-tachometer-alt text-primary me-2"></i>
+                Network Traffic Dashboard
+            </h1>
+            <p class="text-muted mb-0">Real-time network monitoring and analysis</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <div class="dashboard-actions">
+                <button class="btn btn-outline-primary btn-sm me-2" onclick="exportData()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="refreshDashboard()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card metric-card metric-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Packets</h6>
+                        <h3 class="card-title mb-0">{{ "{:,}".format(total_packets) }}</h3>
+                        <small class="text-muted">
+                            <i class="fas fa-arrow-up text-success me-1"></i>
+                            +{{ "{:,}".format(recent_packets) }} recent
+                        </small>
+                    </div>
+                    <div class="metric-icon">
+                        <i class="fas fa-exchange-alt"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card metric-card metric-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Total Flows</h6>
+                        <h3 class="card-title mb-0">{{ "{:,}".format(total_flows) }}</h3>
+                        <small class="text-muted">
+                            <span class="badge bg-success">{{ active_flows }} active</span>
+                        </small>
+                    </div>
+                    <div class="metric-icon">
+                        <i class="fas fa-project-diagram"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card metric-card metric-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Active Flows</h6>
+                        <h3 class="card-title mb-0">{{ active_flows }}</h3>
+                        <small class="text-muted">
+                            <i class="fas fa-circle text-success me-1"></i>
+                            Real-time
+                        </small>
+                    </div>
+                    <div class="metric-icon">
+                        <i class="fas fa-stream"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card metric-card metric-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Protocols</h6>
+                        <h3 class="card-title mb-0">{{ protocol_stats|length }}</h3>
+                        <small class="text-muted">
+                            <i class="fas fa-layer-group me-1"></i>
+                            Detected
+                        </small>
+                    </div>
+                    <div class="metric-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <!-- Traffic Timeline Chart -->
+    <div class="col-lg-8 mb-3">
+        <div class="card chart-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Traffic Timeline (Last 24 Hours)
+                </h6>
+                <div class="chart-controls">
+                    <select class="form-select form-select-sm" id="timeRangeSelect" onchange="updateTrafficChart()">
+                        <option value="1h">1 Hour</option>
+                        <option value="6h">6 Hours</option>
+                        <option value="12h">12 Hours</option>
+                        <option value="24h" selected>24 Hours</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" style="height: 300px; position: relative;">
+                    <canvas id="trafficChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Protocol Distribution Chart -->
+    <div class="col-lg-4 mb-3">
+        <div class="card chart-card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    Protocol Distribution
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" style="height: 300px; position: relative;">
+                    <canvas id="protocolChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Tables Row -->
+<div class="row">
+    <!-- Top Talkers -->
+    <div class="col-lg-6 mb-3">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-users me-2"></i>
+                    Top Source IPs
+                </h6>
+                <a href="{{ url_for('packets') }}" class="btn btn-sm btn-outline-primary">
+                    View All <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if top_sources %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Source IP</th>
+                                <th class="text-end">Packets</th>
+                                <th class="text-end">Bytes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for source in top_sources[:10] %}
+                            <tr>
+                                <td>
+                                    <code class="text-primary">{{ source.source_ip }}</code>
+                                    {% if source.source_ip.startswith(('192.168.', '10.', '172.16.')) %}
+                                    <span class="badge bg-success ms-1">Internal</span>
+                                    {% else %}
+                                    <span class="badge bg-warning ms-1">External</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">{{ "{:,}".format(source.packet_count) }}</td>
+                                <td class="text-end">
+                                    {% if source.total_bytes %}
+                                    {{ "%.1f KB"|format(source.total_bytes / 1024) }}
+                                    {% else %}
+                                    0 KB
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-inbox text-muted fa-2x mb-3"></i>
+                    <p class="text-muted mb-0">No traffic data available</p>
+                    <button class="btn btn-primary mt-2" onclick="simulateTraffic()">
+                        Generate Sample Traffic
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Protocol Statistics -->
+    <div class="col-lg-6 mb-3">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-layer-group me-2"></i>
+                    Protocol Statistics
+                </h6>
+                <a href="{{ url_for('analytics') }}" class="btn btn-sm btn-outline-primary">
+                    Advanced Analytics <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if protocol_stats %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Protocol</th>
+                                <th class="text-end">Packets</th>
+                                <th class="text-end">Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for protocol in protocol_stats %}
+                            <tr>
+                                <td>
+                                    <span class="protocol-badge protocol-{{ protocol.protocol.lower() }}">
+                                        {{ protocol.protocol }}
+                                    </span>
+                                </td>
+                                <td class="text-end">{{ "{:,}".format(protocol.count) }}</td>
+                                <td class="text-end">
+                                    {% set percentage = (protocol.count / total_packets * 100) if total_packets > 0 else 0 %}
+                                    <div class="d-flex align-items-center justify-content-end">
+                                        <div class="progress me-2" style="width: 60px; height: 8px;">
+                                            <div class="progress-bar" style="width: {{ percentage }}%"></div>
+                                        </div>
+                                        <small>{{ "%.1f%%"|format(percentage) }}</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-chart-bar text-muted fa-2x mb-3"></i>
+                    <p class="text-muted mb-0">No protocol data available</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity Row -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-history me-2"></i>
+                    Recent Network Activity
+                </h6>
+                <div class="activity-filters">
+                    <button class="btn btn-sm btn-outline-secondary active" data-filter="all">All</button>
+                    <button class="btn btn-sm btn-outline-secondary" data-filter="tcp">TCP</button>
+                    <button class="btn btn-sm btn-outline-secondary" data-filter="udp">UDP</button>
+                    <button class="btn btn-sm btn-outline-secondary" data-filter="http">HTTP</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="activityFeed" class="activity-feed">
+                    <!-- Activity items will be loaded via JavaScript -->
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="text-muted mt-2">Loading recent activity...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global chart management
+window.PacketSightCharts = {
+    trafficChart: null,
+    protocolChart: null,
+    initialized: false
+};
+
+// Ensure single initialization
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.PacketSightCharts.initialized) {
+        console.log('Dashboard already initialized, skipping...');
+        return;
+    }
+    
+    console.log('Starting dashboard initialization...');
+    window.PacketSightCharts.initialized = true;
+    
+    // Wait for Chart.js to be fully loaded
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js is not loaded');
+        return;
+    }
+    
+    // Initialize after a short delay to ensure DOM is ready
+    setTimeout(initializeDashboard, 500);
+});
+
+function initializeDashboard() {
+    console.log('Initializing dashboard components...');
+    
+    // Destroy any existing charts first
+    destroyExistingCharts();
+    
+    // Initialize charts
+    initializeTrafficChart();
+    initializeProtocolChart();
+    
+    // Load recent activity
+    loadRecentActivity();
+    
+    // Setup auto-refresh (only once)
+    if (!window.dashboardRefreshInterval) {
+        window.dashboardRefreshInterval = setInterval(function() {
+            updateDashboardData();
+            loadRecentActivity(); // Also refresh activity feed
+        }, 30000);
+    }
+}
+
+function destroyExistingCharts() {
+    console.log('Cleaning up existing charts...');
+    
+    // Destroy traffic chart
+    if (window.PacketSightCharts.trafficChart) {
+        try {
+            window.PacketSightCharts.trafficChart.destroy();
+            console.log('Traffic chart destroyed');
+        } catch (e) {
+            console.log('Error destroying traffic chart:', e);
+        }
+        window.PacketSightCharts.trafficChart = null;
+    }
+    
+    // Destroy protocol chart
+    if (window.PacketSightCharts.protocolChart) {
+        try {
+            window.PacketSightCharts.protocolChart.destroy();
+            console.log('Protocol chart destroyed');
+        } catch (e) {
+            console.log('Error destroying protocol chart:', e);
+        }
+        window.PacketSightCharts.protocolChart = null;
+    }
+    
+    // Also check Chart.js registry and destroy any charts on our canvases
+    try {
+        const trafficCanvas = document.getElementById('trafficChart');
+        const protocolCanvas = document.getElementById('protocolChart');
+        
+        if (trafficCanvas) {
+            const existingTrafficChart = Chart.getChart(trafficCanvas);
+            if (existingTrafficChart) {
+                existingTrafficChart.destroy();
+                console.log('Existing traffic chart from registry destroyed');
+            }
+        }
+        
+        if (protocolCanvas) {
+            const existingProtocolChart = Chart.getChart(protocolCanvas);
+            if (existingProtocolChart) {
+                existingProtocolChart.destroy();
+                console.log('Existing protocol chart from registry destroyed');
+            }
+        }
+    } catch (e) {
+        console.log('Error in registry cleanup:', e);
+    }
+}
+
+function initializeTrafficChart() {
+    const chartElement = document.getElementById('trafficChart');
+    if (!chartElement) {
+        console.error('Traffic chart canvas element not found');
+        return;
+    }
+    
+    console.log('Initializing traffic chart...');
+    const ctx = chartElement.getContext('2d');
+    
+    fetch('/api/traffic-timeline?hours=24')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data || data.length === 0) {
+                chartElement.parentNode.innerHTML = '<div class="text-center text-muted py-4">No traffic data available</div>';
+                return;
+            }
+
+            const labels = data.map(item => {
+                const date = new Date(item.timestamp);
+                return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            });
+
+            const packetData = data.map(item => item.packets || 0);
+            const bytesData = data.map(item => Math.round((item.bytes || 0) / 1024));
+
+            window.PacketSightCharts.trafficChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Packets',
+                        data: packetData,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Data (KB)',
+                        data: bytesData,
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.5,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Packets'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Data (KB)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+            
+            console.log('Traffic chart initialized successfully');
+        })
+        .catch(error => {
+            console.error('Error loading traffic chart:', error);
+            chartElement.parentNode.innerHTML = '<div class="text-center text-muted py-4">Failed to load traffic data</div>';
+        });
+}
+
+function initializeProtocolChart() {
+    const chartElement = document.getElementById('protocolChart');
+    if (!chartElement) {
+        console.error('Protocol chart canvas element not found');
+        return;
+    }
+    
+    console.log('Initializing protocol chart...');
+    const ctx = chartElement.getContext('2d');
+    
+    fetch('/api/protocol-distribution')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data || data.length === 0) {
+                chartElement.parentNode.innerHTML = '<div class="text-center text-muted py-4">No protocol data available</div>';
+                return;
+            }
+
+            const labels = data.map(item => item.protocol || 'Unknown');
+            const values = data.map(item => item.packets || 0);
+            const colors = [
+                '#0d6efd', '#198754', '#dc3545', '#ffc107',
+                '#6f42c1', '#fd7e14', '#20c997', '#6c757d'
+            ];
+
+            window.PacketSightCharts.protocolChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.raw / total) * 100).toFixed(1);
+                                    return context.label + ': ' + context.raw.toLocaleString() + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            console.log('Protocol chart initialized successfully');
+        })
+        .catch(error => {
+            console.error('Error loading protocol chart:', error);
+            chartElement.parentNode.innerHTML = '<div class="text-center text-muted py-4">Failed to load protocol data</div>';
+        });
+}
+
+function updateTrafficChart() {
+    const timeRange = document.getElementById('timeRangeSelect').value;
+    console.log('Updating chart for time range:', timeRange);
+    // Implementation would reload the chart with new data
+}
+
+function loadRecentActivity(filter = 'all') {
+    const activityFeed = document.getElementById('activityFeed');
+    if (!activityFeed) return;
+
+    // Show loading state
+    activityFeed.innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mt-2">Loading recent activity...</p>
+        </div>
+    `;
+
+    // Fetch real-time activity data
+    fetch(`/api/recent-activity?filter=${filter}&limit=15`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(activities => {
+            if (!activities || activities.length === 0) {
+                activityFeed.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-inbox text-muted fa-2x mb-3"></i>
+                        <p class="text-muted mb-0">No recent network activity found</p>
+                        <button class="btn btn-primary btn-sm mt-2" onclick="simulateTraffic()">
+                            Generate Sample Traffic
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            // Build activity HTML from real data
+            let activityHTML = '';
+            activities.forEach(activity => {
+                activityHTML += `
+                    <div class="activity-item" data-type="${activity.type}">
+                        <div class="activity-icon bg-${activity.color}">
+                            <i class="${activity.icon}"></i>
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-title">${activity.title}</div>
+                            <div class="activity-details">${activity.details}</div>
+                            <div class="activity-time">${activity.time_ago}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            activityFeed.innerHTML = activityHTML;
+            
+            // Setup filter event listeners
+            setupActivityFilters();
+        })
+        .catch(error => {
+            console.error('Error loading recent activity:', error);
+            activityFeed.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-exclamation-triangle text-warning fa-2x mb-3"></i>
+                    <p class="text-muted mb-0">Failed to load recent activity</p>
+                    <button class="btn btn-outline-primary btn-sm mt-2" onclick="loadRecentActivity()">
+                        Try Again
+                    </button>
+                </div>
+            `;
+        });
+}
+
+function setupActivityFilters() {
+    // Setup filter button event listeners
+    document.querySelectorAll('.activity-filters .btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Remove active class from all buttons
+            document.querySelectorAll('.activity-filters .btn').forEach(b => 
+                b.classList.remove('active'));
+            
+            // Add active class to clicked button
+            this.classList.add('active');
+            
+            // Get filter value
+            const filter = this.dataset.filter || this.textContent.toLowerCase();
+            
+            // Apply filter
+            filterActivityFeed(filter);
+        });
+    });
+}
+
+function filterActivityFeed(filter) {
+    if (filter === 'all') {
+        // Reload all activities
+        loadRecentActivity('all');
+    } else {
+        // Load filtered activities
+        loadRecentActivity(filter);
+    }
+}
+
+function updateDashboardData() {
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            console.log('Dashboard data updated:', data);
+        })
+        .catch(error => {
+            console.error('Error updating dashboard data:', error);
+        });
+}
+
+function refreshDashboard() {
+    window.location.reload();
+}
+
+function exportData() {
+    alert('Data export feature coming soon');
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    destroyExistingCharts();
+    if (window.dashboardRefreshInterval) {
+        clearInterval(window.dashboardRefreshInterval);
+    }
+});
+</script>
+{% endblock %}
